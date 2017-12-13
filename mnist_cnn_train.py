@@ -9,6 +9,8 @@ FLAGS.batch_size = 100
 FLAGS.learning_rate = 0.001
 FLAGS.num_classes = 10
 FLAGS.training_epochs = 15
+FLAGS.log_dir = './log/'
+FLAGS.ckpt_dir = './ckpt/'
 
 # convolutional network layer 1
 def conv1(input_data):
@@ -118,17 +120,29 @@ def main():
     # build model
     logits = build_model(x_img, keep_prob)
 
-    # define cost/loss & optimizer
+    # define cost/loss
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
+    tf.summary.scalar('cost', cost)
+
+    # define optimizer
     optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate).minimize(cost)
+
+    # Test model and check accuracy
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    tf.summary.scalar('accuracy', accuracy)
 
     # initialize
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
+    summary = tf.summary.merge_all()
+    summary_writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
     # train my model
-    print('Learning started. It takes sometime.')
+    print('Learning started.')
     print('Training ', mnist.train.num_examples, ' files')
+    print('Testing ', mnist.test.num_examples, ' files')
+
     for epoch in range(FLAGS.training_epochs):
         avg_cost = 0
         total_batch = int(mnist.train.num_examples / FLAGS.batch_size)
@@ -139,18 +153,20 @@ def main():
             c, _ = sess.run([cost, optimizer], feed_dict=feed_dict)
             avg_cost += c / total_batch
 
+        # check cost/accuracy
         print('Epoch:', '%04d' % (epoch + 1), 'cost =', '{:.9f}'.format(avg_cost))
+        print('Accuracy:', sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels, keep_prob: 1}))
+
+        # log writer
+        summary_str = sess.run(summary, feed_dict={x: mnist.test.images, y: mnist.test.labels, keep_prob: 1})
+        summary_writer.add_summary(summary_str, epoch)
+        summary_writer.flush()
+
     print('Learning Finished!')
 
     # save model
     saver = tf.train.Saver()
-    save_path = saver.save(sess, "./tmp/mnist_cnn.ckpt")
+    save_path = saver.save(sess, FLAGS.ckpt_dir + "mnist_cnn.ckpt")
     print("Model saved in file: ", save_path)
-
-    # Test model and check accuracy
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    print('Testing ', mnist.test.num_examples, ' files')
-    print('Accuracy:', sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels, keep_prob: 1}))
 
 main()

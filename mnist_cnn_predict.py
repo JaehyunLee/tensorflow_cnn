@@ -6,6 +6,7 @@ FLAGS.image_size = 28
 FLAGS.image_color = 1
 FLAGS.maxpool_filter_size = 2
 FLAGS.num_classes = 10
+FLAGS.ckpt_dir = './ckpt/'
 
 # convolutional network layer 1
 def conv1(input_data):
@@ -119,7 +120,7 @@ def main():
     with tf.Session() as sess:
         # restore model
         saver = tf.train.Saver()
-        restore_path = "./tmp/mnist_cnn.ckpt"
+        restore_path = FLAGS.ckpt_dir + "mnist_cnn.ckpt"
         saver.restore(sess, restore_path)
 
         # Test model and check accuracy
@@ -130,4 +131,3 @@ def main():
         print('Accuracy:', sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels, keep_prob: 1}))
 
 main()
-
