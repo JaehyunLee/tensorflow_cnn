@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
 FLAGS = tf.app.flags.FLAGS
@@ -25,7 +26,6 @@ class CNNModel:
         self._build_model()
 
     def _build_model(self):
-
         with tf.name_scope('conv_1'):
             conv1 = tf.layers.conv2d(inputs=self.x_img, filters=32, kernel_size=[3, 3],
                                      padding="SAME", activation=tf.nn.relu)
@@ -61,16 +61,24 @@ class CNNModel:
         return self.sess.run(self.accuracy,
                              feed_dict={self.x: x_test, self.y: y_test, self.keep_prob: keep_prob})
 
+    def predict(self, x_test):
+        return self.sess.run(self.logits,
+                             feed_dict={self.x: x_test, self.keep_prob: 1})
+
 
 def main():
-
     # download training data
     tf.set_random_seed(777)  # reproducibility
     mnist = input_data.read_data_sets("MNIST_data_2/", one_hot=True)
     print("Download Done!")
 
     with tf.Session() as sess:
-        model = CNNModel(sess, "model1")
+        models = []
+        num_models = 3
+
+        for m in range(num_models):
+            models.append(CNNModel(sess, "model" + str(m)))
+
         # restore model
         saver = tf.train.Saver()
         restore_path = FLAGS.ckpt_dir + "mnist_cnn.ckpt"
@@ -79,7 +87,18 @@ def main():
         # Test model and check accuracy
         print('Training ', mnist.train.num_examples, ' files')
         print('Testing ', mnist.test.num_examples, ' files')
-        print('Accuracy:', model.get_accuracy(mnist.test.images, mnist.test.labels, 1))
+        test_size = len(mnist.test.labels)
+        predictions = np.zeros([test_size, 10])
+
+        for m_idx, m in enumerate(models):
+            print('Model', m_idx, 'Accuracy:', m.get_accuracy(
+                mnist.test.images, mnist.test.labels, 1))
+            p = m.predict(mnist.test.images)
+            predictions += p
+
+        ensemble_correct_prediction = tf.equal(tf.argmax(predictions, 1), tf.argmax(mnist.test.labels, 1))
+        ensemble_accuracy = tf.reduce_mean(tf.cast(ensemble_correct_prediction, tf.float32))
+        print('Ensemble accuracy:', sess.run(ensemble_accuracy))
 
 
 main()

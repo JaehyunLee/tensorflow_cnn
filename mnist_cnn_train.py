@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 
 FLAGS = tf.app.flags.FLAGS
@@ -85,7 +86,10 @@ def main():
 
     # build model
     sess = tf.Session()
-    model = CNNModel(sess, "model1")
+    models = []
+    num_models = 3
+    for m in range(num_models):
+        models.append(CNNModel(sess, "model" + str(m)))
 
     # initialize
     sess.run(tf.global_variables_initializer())
@@ -98,21 +102,27 @@ def main():
     print('Testing ', mnist.test.num_examples, ' files')
 
     for epoch in range(FLAGS.training_epochs):
-        avg_cost = 0
+        avg_cost_list = np.zeros(len(models))
         total_batch = int(mnist.train.num_examples / FLAGS.batch_size)
 
         for i in range(total_batch):
             batch_xs, batch_ys = mnist.train.next_batch(FLAGS.batch_size)
-            c, _ = model.train(batch_xs, batch_ys, 0.7)
-            avg_cost += c / total_batch
 
-        # check cost/accuracy
-        print('Epoch:', '%04d' % (epoch + 1), 'cost =', '{:.9f}'.format(avg_cost))
-        print('Accuracy:', model.get_accuracy(mnist.test.images, mnist.test.labels, 1))
+            for m_idx, m in enumerate(models):
+                c, _ = m.train(batch_xs, batch_ys, 0.7)
+                avg_cost_list[m_idx] += c / total_batch
 
-        # log writer
-        summary_str = sess.run(summary,
-                               feed_dict={model.x: mnist.test.images, model.y: mnist.test.labels, model.keep_prob: 1})
+        print('Epoch:', '%04d' % (epoch + 1), 'cost =', avg_cost_list)
+
+        # accuracy & log writer
+        feed_dict = {}
+        for m_idx, m in enumerate(models):
+            print('Model ', m_idx, ' Accuracy:', m.get_accuracy(mnist.test.images, mnist.test.labels, 1))
+            feed_dict[m.x] = mnist.test.images
+            feed_dict[m.y] = mnist.test.labels
+            feed_dict[m.keep_prob] = 1
+
+        summary_str = sess.run(summary, feed_dict=feed_dict)
         summary_writer.add_summary(summary_str, epoch)
         summary_writer.flush()
 
